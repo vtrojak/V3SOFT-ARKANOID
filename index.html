@@ -994,7 +994,7 @@
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                             <span class="text-slate-400 font-medium">Verzia hry:</span>
-                            <strong class="font-display text-purple-300 tracking-wide">1.72</strong>
+                            <strong class="font-display text-purple-300 tracking-wide">1.73</strong>
                         </div>
                         <div class="pt-1 text-center text-xs sm:text-sm text-slate-200 leading-relaxed flex flex-col items-center gap-2">
                             <span>Táto hra je freeware. Tu môžeš sledovať moje videá:</span>
@@ -1835,7 +1835,7 @@
         let score = 0;
         let levelStartScore = 0; // Uložené skóre pred začiatkom aktuálnej úrovne
         let highScore = 0;
-        let levelStartHighScore = 0; // Uložený rekord pred začiatkom aktuálnej úrovne
+        let runStartHighScore = 0; // Historický rekord z predchádzajúcich hier (pred štartom aktuálnej hry)
         let currentFieldScaleY = 90; // Default 90%
 
         // Stav pre cheat VLADO
@@ -1846,13 +1846,14 @@
 
         try {
             highScore = parseInt(localStorage.getItem('neon_arkanoid_sk_best') || '0', 10);
-            levelStartHighScore = highScore;
+            runStartHighScore = highScore;
             const savedScaleY = parseInt(localStorage.getItem('neon_arkanoid_sk_scale_y') || '90', 10);
             if ([100, 90, 80, 70, 60, 50].includes(savedScaleY)) {
                 currentFieldScaleY = savedScaleY;
             }
         } catch (e) {
             highScore = 0;
+            runStartHighScore = 0;
             currentFieldScaleY = 90;
         }
 
@@ -2416,13 +2417,9 @@
                 repeatsLeft = MAX_REPEATS_PER_LEVEL;
                 levelStartScore = score;
                 syncHighScore();
-                levelStartHighScore = highScore;
             } else {
                 score = levelStartScore;
-                highScore = levelStartHighScore;
-                try {
-                    localStorage.setItem('neon_arkanoid_sk_best', String(highScore));
-                } catch (e) {}
+                syncHighScore();
             }
 
             lives = LIVES_PER_LEVEL;
@@ -3076,8 +3073,8 @@
          * UPDATE HUD & ACTIVE EFFECTS UI
          */
         function syncHighScore() {
-            if (!isCheatSession && score > highScore) {
-                highScore = score;
+            if (!isCheatSession) {
+                highScore = Math.max(runStartHighScore, score);
                 try {
                     localStorage.setItem('neon_arkanoid_sk_best', String(highScore));
                 } catch (e) {}
@@ -4240,7 +4237,9 @@
             const remainingBricks = bricks.some(b => b.alive && b.type !== 'INDESTRUCTIBLE');
             if (!remainingBricks) {
                 syncHighScore();
-                levelStartHighScore = highScore;
+                if (currentLevel >= MAX_LEVELS && !isCheatSession) {
+                    runStartHighScore = highScore;
+                }
                 updateHUD();
                 closeMenuDropdown();
 
@@ -5420,6 +5419,9 @@
         function returnToStartMenu() {
             sfx.init();
             sfx.paddleHit();
+            if (!isCheatSession && (gameState === 'GAME_OVER' || gameState === 'VICTORY')) {
+                runStartHighScore = highScore;
+            }
             isCheatSession = false;
             resetGameStats();
             closeMenuDropdown();
@@ -5579,6 +5581,7 @@
         function startFromMainScreen() {
             if (gameState === 'PLAYING') return;
             sfx.init();
+            runStartHighScore = highScore;
             isCheatSession = false;
             resetGameStats();
             closeMenuDropdown();
@@ -5688,7 +5691,7 @@
             sfx.init();
             sfx.paddleHit();
             highScore = 0;
-            levelStartHighScore = 0;
+            runStartHighScore = 0;
             try {
                 localStorage.setItem('neon_arkanoid_sk_best', '0');
             } catch (e) {}
@@ -5764,6 +5767,7 @@
                     hideOverlay();
                 }
             } else if (gameState === 'VICTORY') {
+                runStartHighScore = highScore;
                 isCheatSession = false;
                 resetGameStats();
                 score = 0;
